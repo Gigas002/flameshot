@@ -9,6 +9,7 @@
 
 #include "abstractlogger.h"
 #include "src/cli/commandlineparser.h"
+#include "src/config/cacheutils.h"
 #include "src/config/styleoverride.h"
 #include "src/core/capturerequest.h"
 #include "src/core/flameshot.h"
@@ -22,7 +23,6 @@
 #include <QLibraryInfo>
 #include <QSharedMemory>
 #include <QTranslator>
-
 #if defined(Q_OS_LINUX) || defined(Q_OS_UNIX)
 #include "src/core/flameshotdbusadapter.h"
 #include <QDBusConnection>
@@ -46,11 +46,18 @@ void requestCaptureAndWait(const CaptureRequest& req)
 {
     Flameshot* flameshot = Flameshot::instance();
     flameshot->requestCapture(req);
-    QObject::connect(flameshot, &Flameshot::captureTaken, [&](QPixmap) {
+    QObject::connect(flameshot, &Flameshot::captureTaken, [&](const QPixmap&) {
+#if defined(Q_OS_MACOS)
         // Only useful on MacOS because each instance hosts its own widgets
         if (!FlameshotDaemon::isThisInstanceHostingWidgets()) {
             qApp->exit(0);
         }
+#else
+        // if this instance is not daemon, make sure it exit after caputre finish
+        if (FlameshotDaemon::instance() == nullptr && !Flameshot::instance()->haveExternalWidget()) {
+            qApp->exit(0);
+        }
+#endif
     });
     QObject::connect(flameshot, &Flameshot::captureFailed, []() {
         AbstractLogger::info() << "Screenshot aborted.";
@@ -174,6 +181,11 @@ int main(int argc, char* argv[])
     CommandOption delayOption({ "d", "delay" },
                               QObject::tr("Delay time in milliseconds"),
                               QStringLiteral("milliseconds"));
+
+    CommandOption useLastRegionOption(
+      "last-region",
+      QObject::tr("Repeat screenshot with previously selected region"));
+
     CommandOption regionOption("region",
                                QObject::tr("Screenshot region to select"),
                                QStringLiteral("WxH+X+Y or string"));
@@ -207,7 +219,7 @@ int main(int argc, char* argv[])
                                  QObject::tr("Print raw PNG capture"));
     CommandOption selectionOption(
       { "g", "print-geometry" },
-      QObject::tr("Print geometry of the selection in the format W H X Y. Does "
+      QObject::tr("Print geometry of the selection in the format WxH+X+Y. Does "
                   "nothing if raw is specified"));
     CommandOption screenNumberOption(
       { "n", "number" },
@@ -270,6 +282,7 @@ int main(int argc, char* argv[])
     mainColorOption.addChecker(colorChecker, colorErr);
     delayOption.addChecker(numericChecker, delayErr);
     regionOption.addChecker(regionChecker, regionErr);
+    useLastRegionOption.addChecker(booleanChecker, booleanErr);
     pathOption.addChecker(pathChecker, pathErr);
     trayOption.addChecker(booleanChecker, booleanErr);
     autostartOption.addChecker(booleanChecker, booleanErr);
@@ -288,6 +301,7 @@ int main(int argc, char* argv[])
                         clipboardOption,
                         delayOption,
                         regionOption,
+                        useLastRegionOption,
                         rawImageOption,
                         selectionOption,
                         uploadOption,
@@ -357,6 +371,7 @@ int main(int argc, char* argv[])
         }
         int delay = parser.value(delayOption).toInt();
         QString region = parser.value(regionOption);
+        bool useLastRegion = parser.isSet(useLastRegionOption);
         bool clipboard = parser.isSet(clipboardOption);
         bool raw = parser.isSet(rawImageOption);
         bool printGeometry = parser.isSet(selectionOption);
@@ -365,7 +380,10 @@ int main(int argc, char* argv[])
         bool acceptOnSelect = parser.isSet(acceptOnSelectOption);
         CaptureRequest req(CaptureRequest::GRAPHICAL_MODE, delay, path);
         if (!region.isEmpty()) {
-            req.setInitialSelection(Region().value(region).toRect());
+            auto selectionRegion = Region().value(region).toRect();
+            req.setInitialSelection(selectionRegion);
+        } else if (useLastRegion) {
+            req.setInitialSelection(getLastRegion());
         }
         if (clipboard) {
             req.addTask(CaptureRequest::COPY);
@@ -392,7 +410,6 @@ int main(int argc, char* argv[])
                 req.addSaveTask();
             }
         }
-
         requestCaptureAndWait(req);
     } else if (parser.isSet(fullArgument)) { // FULL
         // Recreate the application as a QApplication
@@ -456,10 +473,10 @@ int main(int argc, char* argv[])
         CaptureRequest req(CaptureRequest::SCREEN_MODE, delay, screenNumber);
         if (!region.isEmpty()) {
             if (region.startsWith("screen")) {
-                // TODO use abstract logger
-                QTextStream(stderr) << "The 'screen' command does not support "
-                                       "'--region screen<N>'.\n"
-                                       "See flameshot --help.\n";
+                AbstractLogger::error()
+                  << "The 'screen' command does not support "
+                     "'--region screen<N>'.\n"
+                     "See flameshot --help.\n";
                 exit(1);
             }
             req.setInitialSelection(Region().value(region).toRect());
