@@ -86,16 +86,18 @@ TrayIcon::~TrayIcon()
     delete m_menu;
 }
 
+#if !defined(DISABLE_UPDATE_CHECKER)
 QAction* TrayIcon::appUpdates()
 {
     return m_appUpdates;
 }
+#endif
 
 void TrayIcon::initMenu()
 {
     m_menu = new QMenu();
 
-    QAction* captureAction = new QAction(tr("&Take Screenshot"), this);
+    auto* captureAction = new QAction(tr("&Take Screenshot"), this);
     connect(captureAction, &QAction::triggered, this, [this]() {
 #if defined(Q_OS_MACOS)
         auto currentMacOsVersion = QOperatingSystemVersion::current();
@@ -113,20 +115,21 @@ void TrayIcon::initMenu()
     });
 #endif
     });
-    QAction* launcherAction = new QAction(tr("&Open Launcher"), this);
+    auto* launcherAction = new QAction(tr("&Open Launcher"), this);
     connect(launcherAction,
             &QAction::triggered,
             Flameshot::instance(),
             &Flameshot::launcher);
-    QAction* configAction = new QAction(tr("&Configuration"), this);
+    auto* configAction = new QAction(tr("&Configuration"), this);
     connect(configAction,
             &QAction::triggered,
             Flameshot::instance(),
             &Flameshot::config);
-    QAction* infoAction = new QAction(tr("&About"), this);
+    auto* infoAction = new QAction(tr("&About"), this);
     connect(
       infoAction, &QAction::triggered, Flameshot::instance(), &Flameshot::info);
 
+#if !defined(DISABLE_UPDATE_CHECKER)
     m_appUpdates = new QAction(tr("Check for updates"), this);
     connect(m_appUpdates,
             &QAction::triggered,
@@ -136,11 +139,12 @@ void TrayIcon::initMenu()
     connect(FlameshotDaemon::instance(),
             &FlameshotDaemon::newVersionAvailable,
             this,
-            [this](QVersionNumber version) {
+            [this](const QVersionNumber& version) {
                 QString newVersion =
                   tr("New version %1 is available").arg(version.toString());
                 m_appUpdates->setText(newVersion);
             });
+#endif
 
     QAction* quitAction = new QAction(tr("&Quit"), this);
     connect(quitAction, &QAction::triggered, qApp, &QCoreApplication::quit);
@@ -159,12 +163,15 @@ void TrayIcon::initMenu()
     m_menu->addSeparator();
     m_menu->addAction(configAction);
     m_menu->addSeparator();
+#if !defined(DISABLE_UPDATE_CHECKER)
     m_menu->addAction(m_appUpdates);
+#endif
     m_menu->addAction(infoAction);
     m_menu->addSeparator();
     m_menu->addAction(quitAction);
 }
 
+#if !defined(DISABLE_UPDATE_CHECKER)
 void TrayIcon::enableCheckUpdatesAction(bool enable)
 {
     if (m_appUpdates != nullptr) {
@@ -175,9 +182,12 @@ void TrayIcon::enableCheckUpdatesAction(bool enable)
         FlameshotDaemon::instance()->getLatestAvailableVersion();
     }
 }
+#endif
 
 void TrayIcon::startGuiCapture()
 {
     auto* widget = Flameshot::instance()->gui();
+#if !defined(DISABLE_UPDATE_CHECKER)
     FlameshotDaemon::instance()->showUpdateNotificationIfAvailable(widget);
+#endif
 }

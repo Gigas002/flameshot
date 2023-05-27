@@ -12,15 +12,18 @@
 #include <QClipboard>
 #include <QDBusConnection>
 #include <QDBusMessage>
+#include <QPixmap>
+#include <QRect>
+
+#if !defined(DISABLE_UPDATE_CHECKER)
 #include <QDesktopServices>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
-#include <QPixmap>
-#include <QRect>
 #include <QTimer>
 #include <QUrl>
+#endif
 
 #ifdef Q_OS_WIN
 #include "src/core/globalshortcutfilter.h"
@@ -57,9 +60,11 @@ FlameshotDaemon::FlameshotDaemon()
   , m_hostingClipboard(false)
   , m_clipboardSignalBlocked(false)
   , m_trayIcon(nullptr)
+#if !defined(DISABLE_UPDATE_CHECKER)
   , m_networkCheckUpdates(nullptr)
   , m_showCheckAppUpdateStatus(false)
   , m_appLatestVersion(QStringLiteral(APP_VERSION).replace("v", ""))
+#endif
 {
     connect(
       QApplication::clipboard(), &QClipboard::dataChanged, this, [this]() {
@@ -79,17 +84,16 @@ FlameshotDaemon::FlameshotDaemon()
             this,
             [this]() {
                 ConfigHandler config;
-                if (config.disabledTrayIcon()) {
-                    enableTrayIcon(false);
-                } else {
-                    enableTrayIcon(true);
-                }
+                enableTrayIcon(!config.disabledTrayIcon());
                 m_persist = !config.autoCloseIdleDaemon();
             });
 #endif
+
+#if !defined(DISABLE_UPDATE_CHECKER)
     if (ConfigHandler().checkForUpdates()) {
         getLatestAvailableVersion();
     }
+#endif
 }
 
 void FlameshotDaemon::start()
@@ -102,7 +106,7 @@ void FlameshotDaemon::start()
     }
 }
 
-void FlameshotDaemon::createPin(QPixmap capture, QRect geometry)
+void FlameshotDaemon::createPin(const QPixmap& capture, QRect geometry)
 {
     if (instance()) {
         instance()->attachPin(capture, geometry);
@@ -124,7 +128,7 @@ void FlameshotDaemon::createPin(QPixmap capture, QRect geometry)
     call(m);
 }
 
-void FlameshotDaemon::copyToClipboard(QPixmap capture)
+void FlameshotDaemon::copyToClipboard(const QPixmap& capture)
 {
     if (instance()) {
         instance()->attachScreenshotToClipboard(capture);
@@ -148,7 +152,8 @@ void FlameshotDaemon::copyToClipboard(QPixmap capture)
     call(m);
 }
 
-void FlameshotDaemon::copyToClipboard(QString text, QString notification)
+void FlameshotDaemon::copyToClipboard(const QString& text,
+                                      const QString& notification)
 {
     if (instance()) {
         instance()->attachTextToClipboard(text, notification);
@@ -181,6 +186,7 @@ void FlameshotDaemon::sendTrayNotification(const QString& text,
     }
 }
 
+#if !defined(DISABLE_UPDATE_CHECKER)
 void FlameshotDaemon::showUpdateNotificationIfAvailable(CaptureWidget* widget)
 {
     if (!m_appLatestUrl.isEmpty() &&
@@ -194,12 +200,14 @@ void FlameshotDaemon::getLatestAvailableVersion()
 {
     // This features is required for MacOS and Windows user and for Linux users
     // who installed Flameshot not from the repository.
-    m_networkCheckUpdates = new QNetworkAccessManager(this);
     QNetworkRequest requestCheckUpdates(QUrl(FLAMESHOT_APP_VERSION_URL));
-    connect(m_networkCheckUpdates,
-            &QNetworkAccessManager::finished,
-            this,
-            &FlameshotDaemon::handleReplyCheckUpdates);
+    if (nullptr == m_networkCheckUpdates) {
+        m_networkCheckUpdates = new QNetworkAccessManager(this);
+        connect(m_networkCheckUpdates,
+                &QNetworkAccessManager::finished,
+                this,
+                &FlameshotDaemon::handleReplyCheckUpdates);
+    }
     m_networkCheckUpdates->get(requestCheckUpdates);
 
     // check for updates each 24 hours
@@ -219,6 +227,7 @@ void FlameshotDaemon::checkForUpdates()
         QDesktopServices::openUrl(QUrl(m_appLatestUrl));
     }
 }
+#endif
 
 /**
  * @brief Return the daemon instance.
@@ -259,7 +268,7 @@ void FlameshotDaemon::quitIfIdle()
 
 // SERVICE METHODS
 
-void FlameshotDaemon::attachPin(QPixmap pixmap, QRect geometry)
+void FlameshotDaemon::attachPin(const QPixmap& pixmap, QRect geometry)
 {
     auto* pinWidget = new PinWidget(pixmap, geometry);
     m_widgets.append(pinWidget);
@@ -272,7 +281,7 @@ void FlameshotDaemon::attachPin(QPixmap pixmap, QRect geometry)
     pinWidget->activateWindow();
 }
 
-void FlameshotDaemon::attachScreenshotToClipboard(QPixmap pixmap)
+void FlameshotDaemon::attachScreenshotToClipboard(const QPixmap& pixmap)
 {
     m_hostingClipboard = true;
     QClipboard* clipboard = QApplication::clipboard();
@@ -307,7 +316,8 @@ void FlameshotDaemon::attachScreenshotToClipboard(const QByteArray& screenshot)
     attachScreenshotToClipboard(p);
 }
 
-void FlameshotDaemon::attachTextToClipboard(QString text, QString notification)
+void FlameshotDaemon::attachTextToClipboard(const QString& text,
+                                            const QString& notification)
 {
     // Must send notification before clipboard modification on linux
     if (!notification.isEmpty()) {
@@ -356,6 +366,7 @@ void FlameshotDaemon::enableTrayIcon(bool enable)
     }
 }
 
+#if !defined(DISABLE_UPDATE_CHECKER)
 void FlameshotDaemon::handleReplyCheckUpdates(QNetworkReply* reply)
 {
     if (!ConfigHandler().checkForUpdates()) {
@@ -394,8 +405,9 @@ void FlameshotDaemon::handleReplyCheckUpdates(QNetworkReply* reply)
     }
     m_showCheckAppUpdateStatus = false;
 }
+#endif
 
-QDBusMessage FlameshotDaemon::createMethodCall(QString method)
+QDBusMessage FlameshotDaemon::createMethodCall(const QString& method)
 {
     QDBusMessage m =
       QDBusMessage::createMethodCall(QStringLiteral("org.flameshot.Flameshot"),

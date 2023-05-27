@@ -114,12 +114,12 @@ QWidget* TextTool::widget()
 void TextTool::closeEditor()
 {
     if (!m_widget.isNull()) {
-        m_widget->close();
+        m_widget->hide();
         delete m_widget;
         m_widget = nullptr;
     }
     if (!m_confW.isNull()) {
-        m_confW->close();
+        m_confW->hide();
         delete m_confW;
         m_confW = nullptr;
     }
@@ -203,10 +203,10 @@ void TextTool::process(QPainter& painter, const QPixmap& pixmap)
     QFont orig_font = painter.font();
     QPen orig_pen = painter.pen();
     QFontMetrics fm(m_font);
-    QSize size(fm.boundingRect(QRect(), 0, m_text).size());
-    size.setWidth(size.width() + val * 2);
-    size.setHeight(size.height() + val * 2);
-    m_textArea.setSize(size);
+    QSize fontsize(fm.boundingRect(QRect(), 0, m_text).size());
+    fontsize.setWidth(fontsize.width() + val * 2);
+    fontsize.setHeight(fontsize.height() + val * 2);
+    m_textArea.setSize(fontsize);
     // draw text
     painter.setFont(m_font);
     painter.setPen(m_color);
