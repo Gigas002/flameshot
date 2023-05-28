@@ -156,7 +156,6 @@ void AppLauncherWidget::launch(const QModelIndex& index)
         close();
     }
 }
-
 void AppLauncherWidget::checkboxClicked(const bool enabled)
 {
     m_keepOpen = enabled;
@@ -173,7 +172,9 @@ void AppLauncherWidget::searchChanged(const QString& text)
         m_tabWidget->hide();
         m_filterList->show();
         m_filterList->clear();
-        QRegExp regexp(text, Qt::CaseInsensitive, QRegExp::Wildcard);
+        auto reOptions = QRegularExpression::CaseInsensitiveOption;
+        QRegularExpression regexp(
+          QRegularExpression::wildcardToRegularExpression(text), reOptions);
         QVector<DesktopAppData> apps;
 
         for (auto const& i : catIconNames.toStdMap()) {

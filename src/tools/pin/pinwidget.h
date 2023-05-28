@@ -23,8 +23,7 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent*) override;
     void mousePressEvent(QMouseEvent*) override;
     void mouseMoveEvent(QMouseEvent*) override;
-    void keyPressEvent(QKeyEvent*) override;
-    void enterEvent(QEvent*) override;
+    void enterEvent(QEvent*);
     void leaveEvent(QEvent*) override;
 
     bool event(QEvent* event) override;

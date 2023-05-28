@@ -32,7 +32,6 @@
 #include <QApplication>
 #include <QDateTime>
 #include <QDebug>
-#include <QDesktopWidget>
 #include <QFontMetrics>
 #include <QLabel>
 #include <QPaintEvent>
@@ -1254,6 +1253,7 @@ void CaptureWidget::initSelection()
         initialSelection.setBottom(initialSelection.bottom() / scale);
         initialSelection.setLeft(initialSelection.left() / scale);
         initialSelection.setRight(initialSelection.right() / scale);
+
     }
     m_selection->setGeometry(initialSelection);
     m_selection->setVisible(!initialSelection.isNull());

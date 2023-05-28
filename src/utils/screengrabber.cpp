@@ -7,7 +7,6 @@
 #include "src/utils/filenamehandler.h"
 #include "src/utils/systemnotification.h"
 #include <QApplication>
-#include <QDesktopWidget>
 #include <QGuiApplication>
 #include <QPixmap>
 #include <QProcess>
@@ -111,8 +110,14 @@ QPixmap ScreenGrabber::grabEntireDesktop(bool& ok)
     ok = true;
 #if defined(Q_OS_MACOS)
     QScreen* currentScreen = QGuiAppCurrentScreen().currentScreen();
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    WId wid = QApplication::desktop()->winId();
+#else
+    int wid = 0;
+#endif
+
     QPixmap screenPixmap(
-      currentScreen->grabWindow(QApplication::desktop()->winId(),
+      currentScreen->grabWindow(wid,
                                 currentScreen->geometry().x(),
                                 currentScreen->geometry().y(),
                                 currentScreen->geometry().width(),
@@ -166,17 +171,20 @@ QPixmap ScreenGrabber::grabEntireDesktop(bool& ok)
     }
 #endif
 #if defined(Q_OS_LINUX) || defined(Q_OS_UNIX) || defined(Q_OS_WIN)
-    QRect geometry = desktopGeometry();
+    QRect geometry;
+    for (QScreen* const screen : QGuiApplication::screens()) {
+        QRect scrRect = screen->geometry();
+        scrRect.moveTo(scrRect.x() / screen->devicePixelRatio(),
+                       scrRect.y() / screen->devicePixelRatio());
+        geometry = geometry.united(scrRect);
+    }
+
     QPixmap p(QApplication::primaryScreen()->grabWindow(
-      QApplication::desktop()->winId(),
-      geometry.x(),
-      geometry.y(),
-      geometry.width(),
-      geometry.height()));
-    auto screenNumber = QApplication::desktop()->screenNumber();
-    QScreen* screen = QApplication::screens()[screenNumber];
+      0, geometry.x(), geometry.y(), geometry.width(), geometry.height()));
+    QScreen* screen = qApp->screenAt(QCursor::pos());
     p.setDevicePixelRatio(screen->devicePixelRatio());
     return p;
+
 #endif
 }
 

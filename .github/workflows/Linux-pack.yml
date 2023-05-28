@@ -221,12 +221,6 @@ jobs:
       matrix:
         dist:
           - {
-              name: fedora-35,
-              os: fedora,
-              symbol: 35,
-              arch: x86_64
-            }
-          - {
               name: fedora-36,
               os: fedora,
               symbol: 36,
