@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
-set(FLAMESHOT_VERSION 11.0.0)
+
+# cmake_policy(SET CMP0076 OLD)
+
+set(FLAMESHOT_VERSION 12.1.0)
 
 set(GIT_API_URL "https://api.github.com/repos/flameshot-org/flameshot/releases/latest")
 project(
@@ -42,6 +45,10 @@ option(GENERATE_TS "Regenerate translation source files" OFF)
 option(USE_EXTERNAL_SINGLEAPPLICATION "Use external QtSingleApplication library" OFF)
 option(USE_LAUNCHER_ABSOLUTE_PATH "Use absolute path for the desktop launcher" ON)
 option(USE_WAYLAND_CLIPBOARD "USE KF Gui Wayland Clipboard" OFF)
+option(DISABLE_UPDATE_CHECKER "Disable check for updates" OFF)
+if (DISABLE_UPDATE_CHECKER)
+  add_compile_definitions(DISABLE_UPDATE_CHECKER)
+endif ()
 
 
 if (USE_QT6)
