@@ -32,7 +32,8 @@ jobs:
           sudo apt-get -y --no-install-recommends install \
             cmake \
             extra-cmake-modules \
-            libvulkan-dev \
+            build-essential \
+            libvulkan-dev
 
       - name: Create Build Environment
         run: cmake -E make_directory ${{runner.workspace}}/build

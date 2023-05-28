@@ -3,7 +3,6 @@
 
 #include "flameshot.h"
 #include "flameshotdaemon.h"
-
 #if defined(Q_OS_MACOS)
 #include "external/QHotkey/QHotkey"
 #endif
@@ -38,6 +37,7 @@
 
 Flameshot::Flameshot()
   : m_captureWindow(nullptr)
+  , m_haveExternalWidget(false)
 #if defined(Q_OS_MACOS)
   , m_HotkeyScreenshotCapture(nullptr)
   , m_HotkeyScreenshotHistory(nullptr)
@@ -114,8 +114,6 @@ CaptureWidget* Flameshot::gui(const CaptureRequest& req)
         }
 
         m_captureWindow = new CaptureWidget(req);
-        // m_captureWindow = new CaptureWidget(req, false); //
-        // debug
 
 #ifdef Q_OS_WIN
         m_captureWindow->show();
@@ -137,20 +135,16 @@ CaptureWidget* Flameshot::gui(const CaptureRequest& req)
 
 void Flameshot::screen(CaptureRequest req, const int screenNumber)
 {
-    if (!resolveAnyConfigErrors())
+    if (!resolveAnyConfigErrors()) {
         return;
+    }
 
     bool ok = true;
     QScreen* screen;
 
     if (screenNumber < 0) {
         QPoint globalCursorPos = QCursor::pos();
-#if QT_VERSION > QT_VERSION_CHECK(5, 10, 0)
         screen = qApp->screenAt(globalCursorPos);
-#else
-        screen =
-          qApp->screens()[qApp->desktop()->screenNumber(globalCursorPos)];
-#endif
     } else if (screenNumber >= qApp->screens().count()) {
         AbstractLogger() << QObject::tr(
           "Requested screen exceeds screen count");
@@ -183,8 +177,9 @@ void Flameshot::screen(CaptureRequest req, const int screenNumber)
 
 void Flameshot::full(const CaptureRequest& req)
 {
-    if (!resolveAnyConfigErrors())
+    if (!resolveAnyConfigErrors()) {
         return;
+    }
 
     bool ok = true;
     QPixmap p(ScreenGrabber().grabEntireDesktop(ok));
@@ -202,10 +197,11 @@ void Flameshot::full(const CaptureRequest& req)
 
 void Flameshot::launcher()
 {
-    if (!resolveAnyConfigErrors())
+    if (!resolveAnyConfigErrors()) {
         return;
+    }
 
-    if (!m_launcherWindow) {
+    if (m_launcherWindow == nullptr) {
         m_launcherWindow = new CaptureLauncher();
     }
     m_launcherWindow->show();
@@ -217,10 +213,11 @@ void Flameshot::launcher()
 
 void Flameshot::config()
 {
-    if (!resolveAnyConfigErrors())
+    if (!resolveAnyConfigErrors()) {
         return;
+    }
 
-    if (!m_configWindow) {
+    if (m_configWindow == nullptr) {
         m_configWindow = new ConfigWindow();
         m_configWindow->show();
 #if defined(Q_OS_MACOS)
@@ -232,7 +229,7 @@ void Flameshot::config()
 
 void Flameshot::info()
 {
-    if (!m_infoWindow) {
+    if (m_infoWindow == nullptr) {
         m_infoWindow = new InfoWindow();
 #if defined(Q_OS_MACOS)
         m_infoWindow->activateWindow();
@@ -282,8 +279,9 @@ Flameshot::Origin Flameshot::origin()
 bool Flameshot::resolveAnyConfigErrors()
 {
     bool resolved = true;
-    ConfigHandler config;
-    if (!config.checkUnrecognizedSettings() || !config.checkSemantics()) {
+    ConfigHandler confighandler;
+    if (!confighandler.checkUnrecognizedSettings() ||
+        !confighandler.checkSemantics()) {
         auto* resolver = new ConfigResolver();
         QObject::connect(
           resolver, &ConfigResolver::rejected, [resolver, &resolved]() {
@@ -336,7 +334,7 @@ void Flameshot::requestCapture(const CaptureRequest& request)
     }
 }
 
-void Flameshot::exportCapture(QPixmap capture,
+void Flameshot::exportCapture(const QPixmap& capture,
                               QRect& selection,
                               const CaptureRequest& req)
 {
@@ -398,15 +396,11 @@ void Flameshot::exportCapture(QPixmap capture,
         CR::ExportTask tasks = tasks;
         QObject::connect(
           widget, &ImgUploaderBase::uploadOk, [=](const QUrl& url) {
-              if (ConfigHandler().copyAndCloseAfterUpload()) {
+              if (ConfigHandler().copyURLAfterUpload()) {
                   if (!(tasks & CR::COPY)) {
                       FlameshotDaemon::copyToClipboard(
                         url.toString(), tr("URL copied to clipboard."));
-                      widget->close();
-                  } else {
-                      widget->showPostUploadDialog();
                   }
-              } else {
                   widget->showPostUploadDialog();
               }
           });
@@ -415,6 +409,15 @@ void Flameshot::exportCapture(QPixmap capture,
     if (!(tasks & CR::UPLOAD)) {
         emit captureTaken(capture);
     }
+}
+
+void Flameshot::setExternalWidget(bool b)
+{
+    m_haveExternalWidget = b;
+}
+bool Flameshot::haveExternalWidget()
+{
+    return m_haveExternalWidget;
 }
 
 // STATIC ATTRIBUTES

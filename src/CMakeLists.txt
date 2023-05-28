@@ -79,12 +79,26 @@ endif ()
 
 add_executable(Flameshot::flameshot ALIAS flameshot)
 
+if(FLAMESHOT_ICON)
+  target_compile_definitions(flameshot PUBLIC FLAMESHOT_ICON="${FLAMESHOT_ICON}")
+endif()
+
 if (WIN32)
     set_property(TARGET flameshot PROPERTY WIN32_EXECUTABLE true)
     if (MSVC)
         target_compile_options(flameshot PRIVATE /source-charset:utf-8)
     endif ()
 endif ()
+
+if(MSVC)
+    OPTION(USE_MP "use multiple" ON)
+    OPTION(ProjectConfig_Global_COMPILE_FLAGS_WITH_MP
+            "Set The Global Option COMPILE_FLAGS /MP to target." ON)
+    if(ProjectConfig_Global_COMPILE_FLAGS_WITH_MP OR USE_MP)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MP")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
+    endif()
+endif()
 
 add_subdirectory(cli)
 add_subdirectory(config)
@@ -222,8 +236,15 @@ target_link_libraries(
 )
 
 if (USE_WAYLAND_CLIPBOARD)
+  if(!USE_WAYLAND_GRIM)
+    message(WARNING "You activated the USE_WAYLAND_CLIPBOARD option, but did not activate the USE_WAYLAND_GRIM option. Flameshot will use the dbus protocol to support wayland. If you use wlroots-based wayland, it is recommended to enable USE_WAYLAND_GRIM")
+  endif()
   target_compile_definitions(flameshot PRIVATE USE_WAYLAND_CLIPBOARD=1)
   target_link_libraries(flameshot KF5::GuiAddons)
+endif()
+
+if (USE_WAYLAND_GRIM)
+    target_compile_definitions(flameshot PRIVATE USE_WAYLAND_GRIM=1)
 endif()
 
 if (USE_QT6)
@@ -249,6 +270,15 @@ if (APPLE)
             qhotkey
     )
 endif ()
+
+
+set(_src_root_path ${CMAKE_CURRENT_SOURCE_DIR})
+file(GLOB_RECURSE _source_list LIST_DIRECTORIES false
+    "${_src_root_path}/*.cpp"
+    "${_src_root_path}/*.h")
+
+#  will be organized according to the actual directory structure, .h.cpp is put together
+source_group(TREE ${_src_root_path} FILES ${_source_list})
 
 if (WIN32)
     set(USE_OPENSSL FALSE)
