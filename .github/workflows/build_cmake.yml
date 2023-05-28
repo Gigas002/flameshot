@@ -2,7 +2,7 @@ name: Building(CMake)
 
 on:
   push:
-    branches: [ qt6_2 ]
+    branches: [ qt6_4 ]
     paths-ignore:
       - 'README.md'
       - 'LICENSE'
